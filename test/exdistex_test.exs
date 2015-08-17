@@ -6,6 +6,6 @@ defmodule ExdistexTest do
   end
 
   test "doesnt pop" do
-  	:ok = Exdistex.connect
+  	a = Exdistex.GenProvider.start_link(Exdistex.ProviderLogger)
   end
 end

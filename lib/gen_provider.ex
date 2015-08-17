@@ -1,12 +1,12 @@
-defmodule Exdistex.Provider do
+defmodule Exdistex.GenProvider do
     use GenServer
     alias AMQP.Basic
 
-    def start_link(m) do
-        GenServer.start_link(__MODULE__, m)
+    def start_link(delegateModule) do
+        GenServer.start_link(__MODULE__, delegateModule)
     end
 
-    def init(m) do
+    def init(delegateModule, delegate_state \\ %{}) do
         {:ok, conn} = AMQP.Connection.open("amqp://admin:admin@localdocker")
         {:ok, chan} = AMQP.Channel.open(conn)
         queueName = "#{:random.uniform}"
@@ -17,7 +17,7 @@ defmodule Exdistex.Provider do
         # AMQP.Queue.subscribe chan, queueName, fn(payload, _meta) -> IO.puts("Received: #{payload}") end
         {:ok, _consumer_tag} = AMQP.Basic.consume(chan, queueName)
 
-        {:ok, %{chan: chan, module: m}}
+        {:ok, %{chan: chan, module: delegateModule, delegate_state: delegate_state}}
     end
 
     # Confirmation sent by the broker after registering this process as a consumer
@@ -35,9 +35,21 @@ defmodule Exdistex.Provider do
         {:noreply, state}
     end
 
-    def handle_info({:basic_deliver, payload, %{delivery_tag: tag, redelivered: redelivered}}, state =%{chan: chan, module: m}) do
-        spawn fn -> m.ping(payload) end
-        {:noreply, state}
+    def handle_info({:basic_deliver, payload, %{delivery_tag: tag, redelivered: redelivered}}, state =%{chan: chan, module: delegateModule, delegate_state: delegate_state}) do
+        delegate_response = delegateModule.handle?(payload,delegate_state)
+        IO.puts "delegateModule replied with #{inspect delegate_response}"
+
+        case  delegate_response do
+            {true, contract_module, new_delegate_state} ->
+                create_contract(payload, contract_module)
+                {:noreply, %{state | delegate_state: new_delegate_state}}
+            {false, new_delegate_state} -> 
+                {:noreply, %{state | delegate_state: new_delegate_state}}
+        end
+    end
+
+    defp create_contract(initial_request, contract_module) do
+        spawn fn -> Exdistex.GenProviderContract.start_link(contract_module, initial_request) end #Need to think about enabling supervision of contracts
     end
 
     defp consume(channel, tag, redelivered, payload) do
