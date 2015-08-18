@@ -41,15 +41,15 @@ defmodule Exdistex.GenProvider do
 
         case  delegate_response do
             {true, contract_module, new_delegate_state} ->
-                create_contract(payload, contract_module)
+                create_contract(payload, contract_module, chan)
                 {:noreply, %{state | delegate_state: new_delegate_state}}
             {false, new_delegate_state} -> 
                 {:noreply, %{state | delegate_state: new_delegate_state}}
         end
     end
 
-    defp create_contract(initial_request, contract_module) do
-        spawn fn -> Exdistex.GenProviderContract.start_link(contract_module, initial_request) end #Need to think about enabling supervision of contracts
+    defp create_contract(initial_request, contract_module, amqp_channel) do
+        spawn_link fn -> Exdistex.GenProviderContract.start_link(contract_module, Poison.decode!(initial_request), amqp_channel) end #Need to think about enabling supervision of contracts
     end
 
     defp consume(channel, tag, redelivered, payload) do

@@ -27,6 +27,6 @@ defmodule Exdistex.Mixfile do
   #
   # Type `mix help deps` for more examples and options
   defp deps do
-    [{:amqp, "0.1.1"}]
+    [{:amqp, "0.1.1"},{:poison, "~> 1.4.0"}]
   end
 end
