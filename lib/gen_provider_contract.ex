@@ -5,7 +5,7 @@ defmodule Exdistex.GenProviderContract do
 		    alias AMQP.Basic
 
 			def start_link(initial_request, amqp_channel) do
-				GenServer.start_link(__MODULE__, %{initial_request: initial_request, amqp_channel: amqp_channel, module: __MODULE__})
+				GenServer.start_link(__MODULE__, %{initial_request: initial_request, amqp_channel: amqp_channel})
 			end
 
 			def init(state = %{amqp_channel: chan, initial_request: initial_request}) do
@@ -20,28 +20,34 @@ defmodule Exdistex.GenProviderContract do
 		            "handlingToken" => token,
 		            "requestId" => request_id
 		        }
-		        :timer.sleep(1000)
-		        IO.puts "publishing message #{Poison.Encoder.encode(message, [])}"
-		        # send_contract_message chan, "event.handler.available", message
 		        AMQP.Basic.publish chan, "distex", "event.handler.available", "#{Poison.Encoder.encode(message, [])}"
 
-		        new_state = state |> Dict.put(:token, token) |> Dict.put(:status, "offered") |> Dict.put(:request_id, request_id)
+		        new_state = state |> Dict.put(:token, token) |> Dict.put(:accepted, false) |> Dict.put(:spec, initial_request) |> Dict.put(:request_id, request_id)
 		        {:ok, new_state}
 			end
 
 			defp send_contract_message(state = %{amqp_channel: chan, token: token}, message_type, body) do
-		        IO.puts "publishing message #{token}.#{message_type} with body #{Poison.Encoder.encode(body, [])}"
 		        AMQP.Basic.publish chan, "distex", "#{token}.#{message_type}", "#{Poison.Encoder.encode(body, [])}"
 			end
 
-			defp process_message("accept", message, state) do
-				IO.puts "Recieved accept message on contract topic #{inspect message}"
+			defp process_message("accept", message, state = %{accepted: false}) do
 				send_contract_message state, "handling", %{"requestId" => state[:request_id], "handlingToken" => state[:token]}
-				state
+				state |> Dict.put(:accepted, true) |> Dict.put(:watching, false) |> Dict.put(:delegate_state, on_handling(state[:spec]))
+			end
+
+			defp process_message("watch", message, state = %{watching: false, accepted: true}) do
+				new_state = state |> Dict.put(:watching, true) |> Dict.put(:delegate_state, on_watch(state[:spec], state[:delegate_state]))
+				send_contract_message state, "watching", %{"requestId" => state[:request_id], "handlingToken" => state[:token]}
+				new_state
+			end
+
+			defp process_message("stopWatching", message, state = %{watching: true, accepted: true}) do
+				new_state = state |> Dict.put(:watching, false) |> Dict.put(:delegate_state, on_stop_watch(state[:spec], state[:delegate_state]))
+				send_contract_message state, "notWatching", %{"requestId" => state[:request_id], "handlingToken" => state[:token]}
+				new_state
 			end
 
 			defp process_message(message_type, message, state) do
-				IO.puts "Recieved message of type #{message_type} on contract topic #{inspect message}"
 				state
 			end
 
@@ -61,14 +67,26 @@ defmodule Exdistex.GenProviderContract do
 		    end
 
 		    def handle_info({:basic_deliver, payload, %{routing_key: routing_key}}, state) do
-		    	IO.puts "routing_key = #{routing_key}"
-		    	IO.puts "message_type = #{extract_message_type(routing_key)}"
 		        {:noreply, process_message(extract_message_type(routing_key), Poison.decode!(payload), state)}
 		    end
 
 		    defp extract_message_type(routing_key)do
 		    	String.replace(routing_key, ~r/[^\.]+\./, "")
 		    end
+
+		    def on_handling(_spec) do
+		    	%{}
+		    end
+
+		    def on_watch(_spec, state) do
+		    	state
+		    end
+
+		    def on_stop_watch(_spec, state) do
+		    	state
+		    end
+
+		    defoverridable [on_handling: 1, on_watch: 2, on_stop_watch: 2]
 		end
 	end
 end
