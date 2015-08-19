@@ -49,7 +49,7 @@ defmodule Exdistex.GenProvider do
     end
 
     defp create_contract(initial_request, contract_module, amqp_channel) do
-        spawn_link fn -> Exdistex.GenProviderContract.start_link(contract_module, Poison.decode!(initial_request), amqp_channel) end #Need to think about enabling supervision of contracts
+        spawn_link fn -> contract_module.start_link(Poison.decode!(initial_request), amqp_channel) end #Need to think about enabling supervision of contracts
     end
 
     defp consume(channel, tag, redelivered, payload) do
