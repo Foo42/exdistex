@@ -2,11 +2,11 @@ defmodule Exdistex.GenProvider do
     use GenServer
     alias AMQP.Basic
 
-    def start_link(delegateModule) do
-        GenServer.start_link(__MODULE__, delegateModule)
+    def start_link(delegateModule, delegate_state \\ %{}) do
+        GenServer.start_link(__MODULE__, {delegateModule, delegate_state})
     end
 
-    def init(delegateModule, delegate_state \\ %{}) do
+    def init({delegateModule, delegate_state}) do
         {:ok, conn} = AMQP.Connection.open("amqp://admin:admin@localdocker")
         {:ok, chan} = AMQP.Channel.open(conn)
         queueName = "#{:random.uniform}"

@@ -22,7 +22,12 @@ defmodule Exdistex.GenProviderContract do
 		        }
 		        AMQP.Basic.publish chan, "distex", "event.handler.available", "#{Poison.Encoder.encode(message, [])}"
 
-		        new_state = state |> Dict.put(:token, token) |> Dict.put(:accepted, false) |> Dict.put(:spec, initial_request) |> Dict.put(:request_id, request_id)
+		        new_state = state 
+		        	|> Dict.put(:token, token)
+		        	|> Dict.put(:accepted, false)
+		        	|> Dict.put(:spec, initial_request)
+		        	|> Dict.put(:request_id, request_id)
+
 		        {:ok, new_state}
 			end
 
@@ -32,17 +37,24 @@ defmodule Exdistex.GenProviderContract do
 
 			defp process_message("accept", message, state = %{accepted: false}) do
 				send_contract_message state, "handling", %{"requestId" => state[:request_id], "handlingToken" => state[:token]}
-				state |> Dict.put(:accepted, true) |> Dict.put(:watching, false) |> Dict.put(:delegate_state, on_handling(state[:spec]))
+				state 
+					|> Dict.put(:accepted, true)
+					|> Dict.put(:watching, false)
+					|> Dict.put(:delegate_state, on_handling(state[:spec]))
 			end
 
 			defp process_message("watch", message, state = %{watching: false, accepted: true}) do
-				new_state = state |> Dict.put(:watching, true) |> Dict.put(:delegate_state, on_watch(state[:spec], state[:delegate_state]))
+				new_state = state
+					|> Dict.put(:watching, true)
+					|> Dict.put(:delegate_state, on_watch(state[:spec], state[:delegate_state]))
 				send_contract_message state, "watching", %{"requestId" => state[:request_id], "handlingToken" => state[:token]}
 				new_state
 			end
 
 			defp process_message("stopWatching", message, state = %{watching: true, accepted: true}) do
-				new_state = state |> Dict.put(:watching, false) |> Dict.put(:delegate_state, on_stop_watch(state[:spec], state[:delegate_state]))
+				new_state = state
+					|> Dict.put(:watching, false)
+					|> Dict.put(:delegate_state, on_stop_watch(state[:spec], state[:delegate_state]))
 				send_contract_message state, "notWatching", %{"requestId" => state[:request_id], "handlingToken" => state[:token]}
 				new_state
 			end
