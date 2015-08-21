@@ -35,8 +35,12 @@ defmodule Exdistex.GenProviderContract do
 		        AMQP.Basic.publish chan, "distex", "#{token}.#{message_type}", "#{Poison.Encoder.encode(body, [])}"
 			end
 
+			defp raise_contract_event(event, contract \\ self()) do
+				send contract, {:raise_contract_event, event}
+			end
+
 			defp process_message("accept", message, state = %{accepted: false}) do
-				send_contract_message state, "handling", %{"requestId" => state[:request_id], "handlingToken" => state[:token]}
+				send_contract_message state, "handling", standard_message_body(state)
 				state 
 					|> Dict.put(:accepted, true)
 					|> Dict.put(:watching, false)
@@ -44,23 +48,27 @@ defmodule Exdistex.GenProviderContract do
 			end
 
 			defp process_message("watch", message, state = %{watching: false, accepted: true}) do
-				new_state = state
+				new_delegate_state = on_watch(state[:spec], state[:delegate_state])
+				send_contract_message state, "watching", standard_message_body(state)
+				state
 					|> Dict.put(:watching, true)
-					|> Dict.put(:delegate_state, on_watch(state[:spec], state[:delegate_state]))
-				send_contract_message state, "watching", %{"requestId" => state[:request_id], "handlingToken" => state[:token]}
-				new_state
+					|> Dict.put(:delegate_state, new_delegate_state)
 			end
 
 			defp process_message("stopWatching", message, state = %{watching: true, accepted: true}) do
-				new_state = state
-					|> Dict.put(:watching, false)
-					|> Dict.put(:delegate_state, on_stop_watch(state[:spec], state[:delegate_state]))
+				new_delegate_state = on_stop_watch(state[:spec], state[:delegate_state])
 				send_contract_message state, "notWatching", %{"requestId" => state[:request_id], "handlingToken" => state[:token]}
-				new_state
+				state
+					|> Dict.put(:watching, false)
+					|> Dict.put(:delegate_state, new_delegate_state)
 			end
 
 			defp process_message(message_type, message, state) do
 				state
+			end
+
+			defp standard_message_body(state) do
+				%{"requestId" => state[:request_id], "handlingToken" => state[:token]}
 			end
 
 			# Confirmation sent by the broker after registering this process as a consumer
@@ -80,6 +88,12 @@ defmodule Exdistex.GenProviderContract do
 
 		    def handle_info({:basic_deliver, payload, %{routing_key: routing_key}}, state) do
 		        {:noreply, process_message(extract_message_type(routing_key), Poison.decode!(payload), state)}
+		    end
+
+		    def handle_info({:raise_contract_event, event}, state) do
+		    	message = standard_message_body(state) |> Dict.put("event", event) 
+				send_contract_message(state, "event", message)
+		    	{:noreply, state}
 		    end
 
 		    defp extract_message_type(routing_key)do

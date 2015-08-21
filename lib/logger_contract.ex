@@ -8,6 +8,11 @@ defmodule Exdistex.LoggerContract do
 
 	def on_watch(_spec, state) do
 		IO.puts "watching"
+		contract = self()
+		spawn_link fn -> 
+			:timer.sleep(5000)
+			raise_contract_event "boo", contract
+		end
 		state
 	end
 
