@@ -1,4 +1,4 @@
-defmodule Exdistex.ConsumerRFSM do
+defmodule Exdistex.GenConsumerContract do
   require Logger
   def start_link(expression, contract_module, contract_state \\ %{}) do
     params = %{
