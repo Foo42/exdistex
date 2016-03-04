@@ -7,14 +7,9 @@ defmodule Exdistex.GenProviderContract do
     defp base_message(state), do: %{"requestId" => state.request_id, "expression" => state.expression}
   end
 
-  def start_link() do
-    Exdistex.GenRabbitFSM.start_link(__MODULE__)
-  end
-
   def start_link(request, options \\ []) do
     Exdistex.GenRabbitFSM.start_link(__MODULE__, request, options)
   end
-
 
   def handle_start(%{} = message) do
     %{"requestId" => request_id, "expression" => expression} = message
@@ -22,32 +17,6 @@ defmodule Exdistex.GenProviderContract do
     handling_token = unique_name
 
     state = %{}
-      |> Map.put(:request_id, request_id)
-      |> Map.put(:handling_token, handling_token)
-      |> Map.put(:expression, expression)
-
-    actions = [
-      subscribe: "#{handling_token}.#",
-      publish: Messages.available(state)
-    ]
-
-    {actions, state}
-  end
-
-  def handle_start(state) do
-    actions = [subscribe: "event.handler.required"]
-    state = state
-      |> Map.put(:state, :unassigned)
-
-    {actions, state}
-  end
-
-  def handle_message({"event.handler.required", message}, state) do
-    %{"requestId" => request_id, "expression" => expression} = message
-
-    handling_token = unique_name
-
-    state = state
       |> Map.put(:request_id, request_id)
       |> Map.put(:handling_token, handling_token)
       |> Map.put(:expression, expression)
