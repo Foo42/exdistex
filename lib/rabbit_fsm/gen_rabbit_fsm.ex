@@ -1,19 +1,17 @@
-defmodule Exdistex.GenRabbitFSM do
+  defmodule Exdistex.GenRabbitFSM do
     require Logger
     use GenServer
     alias AMQP.Basic
 
-    def start_link(delegate_module, delegate_state \\ %{}) do
+    def start_link(delegate_module, delegate_state \\ %{}, options \\ []) do
         GenServer.start_link(__MODULE__, %{delegate_mod: delegate_module, delegate_state: delegate_state})
     end
 
     def init(params) do
         {:ok, conn} = AMQP.Connection.open("amqp://admin:admin@localdocker")
-        Logger.debug("#{inspect self} connection: #{inspect conn}")
 
         {:ok, chan} = AMQP.Channel.open(conn)
         Process.link chan.pid
-        Logger.debug("#{inspect self} chan: #{inspect chan}")
 
         queue_name = unique_name
         {:ok, queue} = AMQP.Queue.declare(chan, queue_name, durable: false, exclusive: true)
@@ -30,33 +28,28 @@ defmodule Exdistex.GenRabbitFSM do
     end
 
     def process_delegate_response({delegate_state}, all_state) do
-      Logger.debug("#{inspect self} process_delegate_response: delegate_state: #{inspect delegate_state}, all state: #{inspect all_state}")
-      res = %{all_state | delegate_state: delegate_state}
-      Logger.debug("#{inspect self} full state after processing #{inspect res}")
-      res
+      %{all_state | delegate_state: delegate_state}
     end
-      def process_delegate_response({actions, delegate_state}, all_state) do
-      Logger.debug("#{inspect self} process_delegate_response: delegate_state: #{inspect delegate_state}, all state: #{inspect all_state}")
-      res = %{perform_requests(actions,all_state) | delegate_state: delegate_state}
-      Logger.debug("#{inspect self} full state after processing #{inspect res}")
-      res
+
+    def process_delegate_response({actions, delegate_state}, all_state) do
+      %{perform_requests(actions,all_state) | delegate_state: delegate_state}
     end
 
     defp perform_requests([], state), do: state
     defp perform_requests(requests, state), do: Enum.reduce(requests, state, &perform_request/2)
     defp perform_request({:subscribe, topic}, state) do
-      Logger.debug "#{inspect self} subscribing to #{topic}"
+      Logger.debug "#{inspect self}:#{state.delegate_mod} subscribing to #{topic}"
       %{channel: chan, queue_name: queue_name} = state
       :ok = AMQP.Queue.bind chan, queue_name, "distex", routing_key: topic
       state
     end
     defp perform_request({:publish, {topic, message}}, %{channel: chan} = state) do
-      Logger.debug "#{inspect self} publishing to #{topic}"
+      Logger.debug "#{inspect self}:#{state.delegate_mod} publishing to #{topic}"
       AMQP.Basic.publish chan, "distex", topic, Poison.encode!(message)
       state
     end
     defp perform_request(action, state) do
-      Logger.debug "#{inspect self} Don't know how to perform #{inspect action}"
+      Logger.debug "#{inspect self}:#{state.delegate_mod} Don't know how to perform #{inspect action}"
       state
     end
 
