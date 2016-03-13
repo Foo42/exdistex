@@ -7,19 +7,22 @@ defmodule Exdistex.GenProviderContract do
     defp base_message(state), do: %{"requestId" => state.request_id, "expression" => state.expression}
   end
 
-  def start_link(request, options \\ []) do
-    Exdistex.GenRabbitFSM.start_link(__MODULE__, request, options)
+  def start_link(contract_module, request, options \\ []) do
+    Exdistex.GenRabbitFSM.start_link(__MODULE__, %{contract_module: contract_module, request: request}, options)
   end
 
-  def handle_start(%{} = message) do
-    %{"requestId" => request_id, "expression" => expression} = message
+  def handle_start(%{contract_module: contract_module, request: request} = params) do
+    %{"requestId" => request_id, "expression" => expression} = request
 
     handling_token = unique_name
 
     state = %{}
+      |> Map.put(:contract_module, contract_module)
       |> Map.put(:request_id, request_id)
       |> Map.put(:handling_token, handling_token)
       |> Map.put(:expression, expression)
+      |> Map.put(:contract_state, %{expression: expression})
+      |> process_contract_event(:init)
 
     actions = [
       subscribe: "#{handling_token}.#",
@@ -29,12 +32,22 @@ defmodule Exdistex.GenProviderContract do
     {actions, state}
   end
 
+# Do this in consumer contract too
+  defp process_contract_event(state, event) do
+    {:ok, contract_state} = state.contract_module.handle_event(event, state.contract_state)
+    %{state | contract_state: contract_state}
+  end
+
   def handle_message({message_key, message}, state) when is_binary(message_key) do
     handle_message({String.split(message_key, "."), message}, state)
   end
 
   def handle_message({[handler, "accept"], message}, %{handling_token: handler} = state) do
-      {[publish: Messages.handling(state)], Map.put(state, :state, :accepting)}
+      new_state = state
+        |> Map.put(:state, :accepted)
+        |> process_contract_event(:accepted)
+
+      {[publish: Messages.handling(state)], new_state}
   end
 
   def handle_message(message, state) do

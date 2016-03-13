@@ -1,8 +1,8 @@
-defmodule Exdistex.LoggingConsumerContract do
+defmodule Exdistex.PingProviderContract do
   require Logger
 
-  def start_link(expression) do
-    Exdistex.GenConsumerContract.start_link expression, __MODULE__
+  def start_link(message, options \\ []) do
+    Exdistex.GenProviderContract.start_link __MODULE__, message, options
   end
 
   def handle_event(event, state) do

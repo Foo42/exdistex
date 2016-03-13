@@ -11,7 +11,8 @@ defmodule Exdistex.SimpleProvider do
 
   def event_handler_required(message, state) do
     Logger.info "#{__MODULE__} accepting contract"
-    Exdistex.GenProviderContract.start_link(message)
+    Exdistex.PingProviderContract.start_link(message)
+    # Exdistex.GenProviderContract.start_link(message)
     %{state | accepted_contracts: state.accepted_contracts + 1 }
   end
 end
