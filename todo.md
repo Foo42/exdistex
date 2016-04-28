@@ -1,3 +1,10 @@
+* Determine a good way for providers to raise events
+  * Sending a message to self. We could provide a funtion via a using macro in GenProviderContract which would encapsulate sending an appropriate message to self which would be handled by the top level process module, ie GenRabbitFSM.
+    * Con: wasteful to use process mailbox loop
+    * Con: could have some negative effects on ordering, as the send will drop into the mailbox after other messages already in
+    * Con: We cannot make a blocking call to raise_event as a call would deadlock since we are already handling a message. This could be problematic for rate limiting.
+  * Passing a lambda down through the layers to the specific ProviderContract. The GenRabbitFSM could pass a lamda down which encapsulates sending a message. Perhaps it would do this as an additional argument to init.
+  * Have the upper layers, ie GenRabbitFSM and GenProviderContract pass all calls/casts which are not specific to them down do lower layers and parse the reply for a :publish element in the tuple. Thus lower levels would have handle_call functions, which could reply with the usual {:no_reply, state} or {:reply, some_reply, state} but also {:publish, {key, message}, state}. This approach embraces the fact that any time we will want to publish we will be handling some message we have been sent and is a natural extension of GenServer. A refinement of this is that we would have GenRabbitFSM check for :publish elements from its delegates, but going down another level, GenProviderContract would probably check for {:raise, some_event, state} form tuples, preventing the specific provider contracts from needing to know the details of raising events.
 * Separate out provider which listens for requests and starts provider contracts to complete negotiation
 * Pass existing connection into contracts
 * consider supervision, is it our responsibility, or calling code? Do we make it easy enough to supervise contracts? Consider supervising contract proxies which manage renegotiation.

@@ -4,11 +4,12 @@
     alias AMQP.Basic
 
     def start_link(delegate_module, delegate_state \\ %{}, options \\ []) do
-        GenServer.start_link(__MODULE__, %{delegate_mod: delegate_module, delegate_state: delegate_state})
+        state = %{delegate_mod: delegate_module, delegate_state: delegate_state, options: options}
+        GenServer.start_link(__MODULE__, state)
     end
 
     def init(params) do
-        {:ok, conn} = AMQP.Connection.open("amqp://admin:admin@localdocker")
+        {:ok, conn} = get_connection(params.options)
 
         {:ok, chan} = AMQP.Channel.open(conn)
         Process.link chan.pid
@@ -18,13 +19,31 @@
 
         :ok = AMQP.Exchange.topic chan, "distex", durable: false, auto_delete: true
         {:ok, consumer_tag} = AMQP.Basic.consume(chan, queue_name)
+        :ok = receive do #Ensure we are consuming before we return from init
+          {:basic_consume_ok, %{consumer_tag: consumer_tag}} -> :ok
+        end
 
         state =
           params
           |> Map.put(:consumer_tag, consumer_tag)
           |> Map.put(:channel, chan)
           |> Map.put(:queue_name, queue_name)
+          |> initialise_delegate()
+
         {:ok, state}
+    end
+
+    defp initialise_delegate(state) do
+      state.delegate_state
+        |> state.delegate_mod.handle_start()
+        |> process_delegate_response(state)
+    end
+
+    defp get_connection(options) do
+      case Keyword.get(options, :connection) do
+        nil -> AMQP.Connection.open("amqp://admin:admin@localdocker")
+        connection -> connection
+      end
     end
 
     def process_delegate_response({delegate_state}, all_state) do
@@ -86,7 +105,20 @@
         {:noreply, new_state}
     end
 
+    def handle_call(message, from, %{delegate_mod: delegate_mod, delegate_state: delegate_state} = state) do
+      delegate_result = delegate_mod.handle_call(message, from, delegate_state)
+      result = case Tuple.to_list(delegate_result) do
+        [:actions | [action_list | tail]] ->
+          tail
+          |> List.update_at(-1, &process_delegate_response({action_list, &1}, state))
+          |> List.to_tuple
+        parts -> parts
+          |> List.update_at(-1, &process_delegate_response({[], &1}, state))
+          |> List.to_tuple
+      end
+    end
+
     defp unique_name do
-      :erlang.unique_integer |> Integer.to_string |> String.replace "-", "N"
+      :erlang.unique_integer() |> Integer.to_string() |> String.replace("-", "N")
     end
 end
