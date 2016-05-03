@@ -23,20 +23,17 @@
           {:basic_consume_ok, %{consumer_tag: consumer_tag}} -> :ok
         end
 
-        state =
-          params
+        params
           |> Map.put(:consumer_tag, consumer_tag)
           |> Map.put(:channel, chan)
           |> Map.put(:queue_name, queue_name)
           |> initialise_delegate()
-
-        {:ok, state}
     end
 
     defp initialise_delegate(state) do
       state.delegate_state
         |> state.delegate_mod.handle_start()
-        |> process_delegate_response(state)
+        |> process_delegate_response(state, :ok)
     end
 
     defp get_connection(options) do
@@ -46,13 +43,28 @@
       end
     end
 
-    def process_delegate_response({delegate_state}, all_state) do
-      %{all_state | delegate_state: delegate_state}
+    def process_delegate_response(response, all_state, default_tuple_prefix \\ :noreply) when is_tuple(response) do
+      response_parts = Tuple.to_list(response)
+      state_after_actions = case response_parts do
+        [:actions | [action_list | _tail]] ->
+          perform_requests(action_list, all_state)
+        _parts -> all_state
+      end
+
+      response_parts
+        |> drop_actions()
+        |> List.update_at(-1, &%{state_after_actions | delegate_state: &1})
+        |> apply_default_prefix(default_tuple_prefix)
+        |> List.to_tuple
     end
 
-    def process_delegate_response({actions, delegate_state}, all_state) do
-      %{perform_requests(actions,all_state) | delegate_state: delegate_state}
-    end
+    defp apply_default_prefix([h|t] = parts_list, _) when is_atom(h), do: parts_list
+    defp apply_default_prefix([h|t] = parts_list, prefix), do: [prefix | parts_list]
+
+    defp drop_actions([:actions | [action_list | tail]]), do: tail
+    defp drop_actions(parts), do: parts
+    #todo: update callers, implementers now need to return different format tuple, and we need to consider whether
+    # handle message implementations ought to need to add a :no_reply element as they cant actually "reply" as such
 
     defp perform_requests([], state), do: state
     defp perform_requests(requests, state), do: Enum.reduce(requests, state, &perform_request/2)
@@ -74,6 +86,7 @@
 
     # Confirmation sent by the broker after registering this process as a consumer
     def handle_info({:basic_consume_ok, %{consumer_tag: consumer_tag}}, %{delegate_mod: delegate_mod, delegate_state: delegate_state} = state) do
+      throw "should not hit this"
         new_state =
           delegate_state
           |> delegate_mod.handle_start
@@ -97,25 +110,15 @@
           _ -> payload
         end
 
-        new_state =
-          {key, message}
+        {key, message}
           |> delegate_mod.handle_message(delegate_state)
           |> process_delegate_response(state)
-
-        {:noreply, new_state}
     end
 
     def handle_call(message, from, %{delegate_mod: delegate_mod, delegate_state: delegate_state} = state) do
-      delegate_result = delegate_mod.handle_call(message, from, delegate_state)
-      result = case Tuple.to_list(delegate_result) do
-        [:actions | [action_list | tail]] ->
-          tail
-          |> List.update_at(-1, &process_delegate_response({action_list, &1}, state))
-          |> List.to_tuple
-        parts -> parts
-          |> List.update_at(-1, &process_delegate_response({[], &1}, state))
-          |> List.to_tuple
-      end
+      message
+        |> delegate_mod.handle_call(from, delegate_state)
+        |> process_delegate_response(state)
     end
 
     defp unique_name do

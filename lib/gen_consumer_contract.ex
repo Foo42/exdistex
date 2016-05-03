@@ -16,7 +16,7 @@ defmodule Exdistex.GenConsumerContract do
       |> Map.put(:request_id, request_id)
       |> Map.put(:state, :requested)
       |> Map.put(:contract_state, state.contract_module.handle_event(:init, state.contract_state))
-    {actions, state}
+    {:actions, actions, state}
   end
 
   def handle_start(state) do
@@ -36,7 +36,7 @@ defmodule Exdistex.GenConsumerContract do
         "expression" => state.expression
       }}
     ]
-    {actions, state}
+    {:actions, actions, state}
   end
 
   def handle_message({message_key, %{"requestId" => request_id} = message}, state) when is_binary(message_key) do

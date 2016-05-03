@@ -29,7 +29,7 @@ defmodule Exdistex.GenProviderContract do
       publish: Messages.available(state)
     ]
 
-    {actions, state}
+    {:actions, actions, state}
   end
 
 # Do this in consumer contract too
@@ -47,7 +47,7 @@ defmodule Exdistex.GenProviderContract do
         |> Map.put(:state, :accepted)
         |> process_contract_event(:accepted)
 
-      {[publish: Messages.handling(state)], new_state}
+      {:actions, [publish: Messages.handling(state)], new_state}
   end
 
   def handle_message(message, state) do

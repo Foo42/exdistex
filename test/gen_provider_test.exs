@@ -19,7 +19,7 @@ defmodule Exdistex.GenProviderTest do
   #So may as well start with those tests and drill in for low level as required.
   test "on start delegates to given module then subscribes to event.handler.required messages" do
     state = %{provider_mod: TestProvider, provider_state: self}
-    {actions, _state} = GenProvider.handle_start(state)
+    {:actions, actions, _state} = GenProvider.handle_start(state)
     assert_receive :init
     assert actions == [subscribe: "event.handler.required"]
   end

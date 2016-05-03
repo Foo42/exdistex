@@ -1,13 +1,17 @@
 defmodule Exdistex.IntegrationTest do
   use ExUnit.Case
+  require Logger
 
   defmodule TestConsumerContract do
     def handle_event(event, test_pid) do
+      Logger.debug("TestConsumerContract handling event #{inspect event}")
       send test_pid, event
       test_pid
     end
   end
 
+  @tag only: true
+  @tag integration: true
   test "Can establish arrangement from a consumer contract to a producer" do
     test_pid = self()
 
