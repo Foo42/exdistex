@@ -35,7 +35,7 @@ defmodule Exdistex.GenConsumerContract do
         }
       }
     ]
-    {:ok, actions, state}
+    {:actions, actions, state}
   end
 
   def handle_message({"event.handler.available", %{"requestId" => request_id} = message}, %{request_id: request_id} = state) do

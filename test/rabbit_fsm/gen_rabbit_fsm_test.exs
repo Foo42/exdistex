@@ -33,15 +33,37 @@ defmodule Exdistex.GenRabbitFSMTest do
     assert after_processing == {:noreply, %{delegate_state: :this_is_delegate_state, other: :stuff}}
   end
 
+  defmodule TestDelegate do
+    def perform_action({:generate_more_actions, 0} = action, state) do
+      send state.test_pid, {:recieved_action, action}
+      {:ok, state}
+    end
+    def perform_action({:generate_more_actions, n} = action, state) do
+      send state.test_pid, {:recieved_action, action}
+      actions = [{:generate_more_actions, n - 1}]
+      {:actions, actions, state}
+    end
+
+    def perform_action(action, state) do
+      send state.test_pid, {:recieved_action, action}
+      {:ok, state}
+    end
+  end
+
   @tag only: true
-  test "process delegate response performs returned actions delegating unknown actions" do
+  test "perform_actions recursively performs returned actions delegating unknown actions" do
     delegate_state = %{test_pid: self()}
     total_state = %{delegate_state: delegate_state, delegate_mod: TestDelegate, other: :stuff}
-    response_from_delegate = {:actions, [{:funky_action}], :noreply, delegate_state}
+    GenRabbitFSM.perform_actions([{:generate_more_actions, 1}, {:funky_action}], total_state)
+    receive do
+      {:recieved_action, {:generate_more_actions, 1}} -> :ok
+    end
+    receive do
+      {:recieved_action, {:generate_more_actions, 0}} -> :ok
+    end
     receive do
       {:recieved_action, {:funky_action}} -> :ok
     end
-    GenRabbitFSM.process_delegate_response(response_from_delegate, total_state)
   end
 
   test "can start without errors" do

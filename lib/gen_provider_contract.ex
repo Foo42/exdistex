@@ -84,7 +84,7 @@ defmodule Exdistex.GenProviderContract do
         }
       }
     ]
-    {:ok, actions, state}
+    {:actions, actions, state}
   end
 
   defp unique_name do

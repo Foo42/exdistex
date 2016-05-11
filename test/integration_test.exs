@@ -18,7 +18,6 @@ defmodule Exdistex.IntegrationTest do
     {:ok, provider} = Exdistex.SimpleProvider.start_link
     {:ok, consumer} = Exdistex.GenConsumerContract.start_link(%{"ping" => "once"}, TestConsumerContract, test_pid)
 
-
     assert_receive :handled
     Exdistex.GenConsumerContract.begin_watching(consumer)
     assert_receive {:event, "ping!"}
