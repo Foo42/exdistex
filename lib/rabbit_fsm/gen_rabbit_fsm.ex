@@ -69,7 +69,6 @@
       case perform_action(h, state) do
         {:ok, new_state} -> perform_actions(t, new_state)
         {:actions, additional_actions,  new_state} -> perform_actions(additional_actions ++ t, new_state)
-        {:ok, additional_actions,  new_state} -> perform_actions(additional_actions ++ t, new_state)
       end
     end
 
@@ -89,7 +88,6 @@
       if Enum.member?(state.delegate_mod.__info__(:functions), {:perform_action, 2}) do
         case state.delegate_mod.perform_action(action, state.delegate_state) do
           {:ok, new_delegate_state} -> {:ok, %{state | delegate_state: new_delegate_state}}
-          {:ok, actions, new_delegate_state} -> {:ok, actions, %{state | delegate_state: new_delegate_state}}
           {:actions, actions, new_delegate_state} -> {:actions, actions, %{state | delegate_state: new_delegate_state}}
         end
       else
