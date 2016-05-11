@@ -3,6 +3,7 @@ defmodule Exdistex.GenProviderContract do
 
   defmodule Messages do
     def handling(state), do: {"#{state.handling_token}.handling", base_message(state)}
+    def watching(state), do: {"#{state.handling_token}.watching", base_message(state)}
     def available(state), do: {"event.handler.available", base_message(state) |> Map.put("handlingToken", state.handling_token)}
     defp base_message(state), do: %{"requestId" => state.request_id, "expression" => state.expression}
   end
@@ -21,7 +22,7 @@ defmodule Exdistex.GenProviderContract do
       |> Map.put(:request_id, request_id)
       |> Map.put(:handling_token, handling_token)
       |> Map.put(:expression, expression)
-      |> Map.put(:contract_state, %{expression: expression})
+      |> Map.put(:contract_state, expression)
       |> process_contract_event(:init)
 
     actions = [
@@ -50,9 +51,40 @@ defmodule Exdistex.GenProviderContract do
       {:actions, [publish: Messages.handling(state)], new_state}
   end
 
+  def handle_message({[handler, "watch"], message}, %{handling_token: handler} = state) do
+      new_state = state
+        |> Map.put(:state, :watching)
+        |> process_contract_event(:watching)
+
+      {:actions, [publish: Messages.watching(state)], new_state}
+  end
+
   def handle_message(message, state) do
     Logger.debug "#{inspect self}:#{__MODULE__} ignoring message: #{inspect message}"
     {state}
+  end
+
+  def handle_call(message, from, state) do
+    message
+      |> state.contract_module.handle_call(from, state.contract_state)
+      |> Tuple.to_list()
+      |> List.update_at(-1, &%{state | contract_state: &1})
+      |> List.to_tuple()
+  end
+
+  def perform_action({:send_event, event}, state) do
+    Logger.debug "performing send event action"
+    actions = [publish:
+      {"#{state.handling_token}.event",
+        %{
+          "handlingToken" => state.handling_token,
+          "requestId" => state.request_id,
+          "expression" => state.expression,
+          "event" => event
+        }
+      }
+    ]
+    {:ok, actions, state}
   end
 
   defp unique_name do

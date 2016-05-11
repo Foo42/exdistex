@@ -4,7 +4,7 @@ defmodule Exdistex.IntegrationTest do
 
   defmodule TestConsumerContract do
     def handle_event(event, test_pid) do
-      Logger.debug("TestConsumerContract handling event #{inspect event}")
+      Logger.debug "#{__MODULE__} recieved contract event: #{inspect event}"
       send test_pid, event
       test_pid
     end
@@ -18,6 +18,9 @@ defmodule Exdistex.IntegrationTest do
     {:ok, provider} = Exdistex.SimpleProvider.start_link
     {:ok, consumer} = Exdistex.GenConsumerContract.start_link(%{"ping" => "once"}, TestConsumerContract, test_pid)
 
+
     assert_receive :handled
+    Exdistex.GenConsumerContract.begin_watching(consumer)
+    assert_receive {:event, "ping!"}
   end
 end

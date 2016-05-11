@@ -47,7 +47,7 @@
       response_parts = Tuple.to_list(response)
       state_after_actions = case response_parts do
         [:actions | [action_list | _tail]] ->
-          perform_requests(action_list, all_state)
+          perform_actions(action_list, all_state)
         _parts -> all_state
       end
 
@@ -63,25 +63,36 @@
 
     defp drop_actions([:actions | [action_list | tail]]), do: tail
     defp drop_actions(parts), do: parts
-    #todo: update callers, implementers now need to return different format tuple, and we need to consider whether
-    # handle message implementations ought to need to add a :no_reply element as they cant actually "reply" as such
 
-    defp perform_requests([], state), do: state
-    defp perform_requests(requests, state), do: Enum.reduce(requests, state, &perform_request/2)
-    defp perform_request({:subscribe, topic}, state) do
+    defp perform_actions([], state), do: state
+    defp perform_actions([h | t], state) do
+      case perform_action(h, state) do
+        {:ok, new_state} -> perform_actions(t, new_state)
+        {:ok, additional_actions,  new_state} -> perform_actions(additional_actions ++ t, new_state)
+      end
+    end
+
+    defp perform_action({:subscribe, topic}, state) do
       Logger.debug "#{inspect self}:#{state.delegate_mod} subscribing to #{topic}"
       %{channel: chan, queue_name: queue_name} = state
       :ok = AMQP.Queue.bind chan, queue_name, "distex", routing_key: topic
-      state
+      {:ok, state}
     end
-    defp perform_request({:publish, {topic, message}}, %{channel: chan} = state) do
+    defp perform_action({:publish, {topic, message}}, %{channel: chan} = state) do
       Logger.debug "#{inspect self}:#{state.delegate_mod} publishing to #{topic}"
       AMQP.Basic.publish chan, "distex", topic, Poison.encode!(message)
-      state
+      {:ok, state}
     end
-    defp perform_request(action, state) do
-      Logger.debug "#{inspect self}:#{state.delegate_mod} Don't know how to perform #{inspect action}"
-      state
+
+    defp perform_action(action, state) do
+      if Enum.member?(state.delegate_mod.__info__(:functions), {:perform_action, 2}) do
+        case state.delegate_mod.perform_action(action, state.delegate_state) do
+          {:ok, new_delegate_state} -> {:ok, %{state | delegate_state: new_delegate_state}}
+          {:ok, actions, new_delegate_state} -> {:ok, actions, %{state | delegate_state: new_delegate_state}}
+        end
+      else
+        {:ok, state}
+      end
     end
 
     # Confirmation sent by the broker after registering this process as a consumer

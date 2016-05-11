@@ -19,7 +19,6 @@ defmodule Exdistex.GenRabbitFSMTest do
     end
   end
 
-  @tag only: true
   test "process delegate response passes regular OTP responses through mixing returned delegate state into given state" do
     total_state = %{delegate_state: :old, other: :stuff}
     response_from_delegate = {:noreply, :this_is_delegate_state}
@@ -27,7 +26,6 @@ defmodule Exdistex.GenRabbitFSMTest do
     assert after_processing == {:noreply, %{delegate_state: :this_is_delegate_state, other: :stuff}}
   end
 
-  @tag only: true
   test "process delegate response removes actions from response" do
     total_state = %{delegate_state: :old, other: :stuff}
     response_from_delegate = {:actions, [], :noreply, :this_is_delegate_state}
@@ -36,6 +34,16 @@ defmodule Exdistex.GenRabbitFSMTest do
   end
 
   @tag only: true
+  test "process delegate response performs returned actions delegating unknown actions" do
+    delegate_state = %{test_pid: self()}
+    total_state = %{delegate_state: delegate_state, delegate_mod: TestDelegate, other: :stuff}
+    response_from_delegate = {:actions, [{:funky_action}], :noreply, delegate_state}
+    receive do
+      {:recieved_action, {:funky_action}} -> :ok
+    end
+    GenRabbitFSM.process_delegate_response(response_from_delegate, total_state)
+  end
+
   test "can start without errors" do
     {:ok, fsm} = GenRabbitFSM.start_link(Tester, %{test: self(), subscribe_to: "foo.bar"})
   end
