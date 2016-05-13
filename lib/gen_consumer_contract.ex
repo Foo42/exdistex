@@ -17,12 +17,17 @@ defmodule Exdistex.GenConsumerContract do
     state = state
       |> Map.put(:request_id, request_id)
       |> Map.put(:state, :requested)
-      |> Map.put(:contract_state, state.contract_module.handle_event(:init, state.contract_state))
+      |> process_contract_event(:init)
     {:actions, actions, state}
   end
 
   def handle_start(state) do
     {state}
+  end
+
+  defp process_contract_event(state, event) do
+    {:ok, contract_state} = state.contract_module.handle_event(event, state.contract_state)
+    %{state | contract_state: contract_state}
   end
 
   def perform_action(:begin_watching, state) do
@@ -59,35 +64,26 @@ defmodule Exdistex.GenConsumerContract do
   end
 
   def handle_message({[_,"handling"],message}, %{state: :accepting} = state) do
-    state =
-      state
+    state
       |> Map.put(:state, :handled)
-      |> Map.put(:contract_state, state.contract_module.handle_event(:handled, state.contract_state))
+      |> process_contract_event(:handled)
     {state}
   end
 
-  def handle_message({[_,"watching"], _message}, state) do
-    {Map.put(state, :contract_state, state.contract_module.handle_event(:watching, state.contract_state))}
-  end
-
-  def handle_message({[_,"notWatching"], _message}, state) do
-    {Map.put(state, :contract_state, state.contract_module.handle_event(:not_watching, state.contract_state))}
-  end
-
-  def handle_message({[_,"event"], %{"event" => event}}, state) do
-    {Map.put(state, :contract_state, state.contract_module.handle_event({:event, event}, state.contract_state))}
-  end
+  def handle_message({[_,"watching"], _message}, state), do: {process_contract_event(state, :watching)}
+  def handle_message({[_,"notWatching"], _message}, state), do: {process_contract_event(state, :not_watching)}
+  def handle_message({[_,"event"], message}, state), do: {process_contract_event(state, {:event, message["event"]})}
 
   def handle_message(message, state) do
     Logger.debug "#{inspect self}:#{__MODULE__} ignoring message: #{inspect message} with current state #{inspect state}"
     {state}
   end
 
-  defp unique_name do
-    :erlang.unique_integer |> Integer.to_string |> String.replace("-", "N")
-  end
-
   def handle_call({:begin_watching}, _from, state) do
     {:actions, [:begin_watching], :reply, :ok, state}
+  end
+
+  defp unique_name do
+    :erlang.unique_integer |> Integer.to_string |> String.replace("-", "N")
   end
 end

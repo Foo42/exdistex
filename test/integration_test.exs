@@ -6,7 +6,7 @@ defmodule Exdistex.IntegrationTest do
     def handle_event(event, test_pid) do
       Logger.debug "#{__MODULE__} recieved contract event: #{inspect event}"
       send test_pid, event
-      test_pid
+      {:ok, test_pid}
     end
   end
 
