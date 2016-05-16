@@ -83,6 +83,14 @@ defmodule Exdistex.GenConsumerContract do
     {:actions, [:begin_watching], :reply, :ok, state}
   end
 
+  def handle_call(message, from, state) do
+    message
+      |> state.contract_module.handle_call(from, state.contract_state)
+      |> Tuple.to_list()
+      |> List.update_at(-1, &%{state | contract_state: &1})
+      |> List.to_tuple()
+  end
+
   defp unique_name do
     :erlang.unique_integer |> Integer.to_string |> String.replace("-", "N")
   end
