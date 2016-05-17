@@ -1,6 +1,15 @@
 defmodule Exdistex.GenProviderContract do
   require Logger
 
+  defmacro __using__(_) do
+    quote do
+      def handle_event(_event, state), do: state
+      def handle_call(_message, _from, state), do: state
+
+      defoverridable [handle_event: 2, handle_call: 3]
+    end
+  end
+
   defmodule Messages do
     def handling(state), do: {"#{state.handling_token}.handling", base_message(state)}
     def watching(state), do: {"#{state.handling_token}.watching", base_message(state)}

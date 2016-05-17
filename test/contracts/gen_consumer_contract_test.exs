@@ -3,6 +3,8 @@ defmodule Exdistex.GenConsumerContractTest do
   use ExUnit.Case
 
   defmodule TestContract do
+    use Exdistex.GenConsumerContract
+    
     def handle_call(message, _from, state) do
       reply = {:recieved, message, state}
       new_state = :updated

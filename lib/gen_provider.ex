@@ -12,9 +12,4 @@ defmodule Exdistex.GenProvider do
     provider_state = state.provider_mod.event_handler_required message, state.provider_state
     {%{state | provider_state: provider_state}}
   end
-
-  def handle_message({"event.handler.required", message}, state) do
-    provider_state = state.provider_mod.event_handler_required message, state.provider_state
-    {%{state | provider_state: provider_state}}
-  end
 end
