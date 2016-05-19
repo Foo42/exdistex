@@ -97,6 +97,6 @@ defmodule Exdistex.GenProviderContract do
   end
 
   defp unique_name do
-    :erlang.unique_integer |> Integer.to_string |> String.replace("-", "N")
+    Exdistex.Unique.string
   end
 end
