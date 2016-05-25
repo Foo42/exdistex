@@ -18,10 +18,10 @@ defmodule Exdistex.GenProviderContract do
   end
 
   def start_link(contract_module, request, options \\ []) do
-    Exdistex.GenRabbitFSM.start_link(__MODULE__, %{contract_module: contract_module, request: request}, options)
+    Exdistex.GenRabbitFSM.start_link(__MODULE__, %{contract_module: contract_module, request: request, options: options}, options)
   end
 
-  def handle_start(%{contract_module: contract_module, request: request} = params) do
+  def handle_start(%{contract_module: contract_module, request: request, options: options} = params) do
     %{"requestId" => request_id, "expression" => expression} = request
 
     handling_token = unique_name
@@ -31,7 +31,7 @@ defmodule Exdistex.GenProviderContract do
       |> Map.put(:request_id, request_id)
       |> Map.put(:handling_token, handling_token)
       |> Map.put(:expression, expression)
-      |> Map.put(:contract_state, expression)
+      |> Map.put(:contract_state, %{expression: expression, request: request, options: options})
       |> process_contract_event(:init)
 
     actions = [

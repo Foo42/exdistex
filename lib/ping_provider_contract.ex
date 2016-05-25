@@ -5,7 +5,7 @@ defmodule Exdistex.PingProviderContract do
     Exdistex.GenProviderContract.start_link __MODULE__, message, options
   end
 
-  def handle_event(:init, expression) do
+  def handle_event(:init, %{expression: expression}) do
     {:ok, %{message: expression, pinger: nil}}
   end
 

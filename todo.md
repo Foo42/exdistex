@@ -8,3 +8,5 @@
 * Separate out provider which listens for requests and starts provider contracts to complete negotiation
 * Pass existing connection into contracts
 * consider supervision, is it our responsibility, or calling code? Do we make it easy enough to supervise contracts? Consider supervising contract proxies which manage renegotiation.
+
+How should consumer contract initiate a watch? Needs to be able to do in respons to contract events, or recieving a message. Should we treat it as an action? ie, allow it to return along the lines of {:actions, [:start_watch], state}
