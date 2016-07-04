@@ -3,8 +3,8 @@ defmodule Exdistex.GenProviderContract do
 
   defmacro __using__(_) do
     quote do
-      def handle_event(_event, state), do: state
-      def handle_call(_message, _from, state), do: state
+      def handle_event(_event, state), do: {:ok, state}
+      def handle_call(_message, _from, state), do: {:reply, :ok, state}
 
       defoverridable [handle_event: 2, handle_call: 3]
     end
@@ -23,7 +23,6 @@ defmodule Exdistex.GenProviderContract do
 
   def handle_start(%{contract_module: contract_module, request: request, options: options} = params) do
     %{"requestId" => request_id, "expression" => expression} = request
-
     handling_token = unique_name
 
     state = %{}
