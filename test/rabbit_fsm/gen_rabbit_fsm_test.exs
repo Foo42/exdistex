@@ -50,7 +50,6 @@ defmodule Exdistex.GenRabbitFSMTest do
     end
   end
 
-  @tag only: true
   test "perform_actions recursively performs returned actions delegating unknown actions" do
     delegate_state = %{test_pid: self()}
     total_state = %{delegate_state: delegate_state, delegate_mod: TestDelegate, other: :stuff}
@@ -76,7 +75,6 @@ defmodule Exdistex.GenRabbitFSMTest do
     AMQP.Basic.publish chan, "distex", topic, message
   end
 
-  @tag only: true
   test "delegate module is passed messages from rabbit" do
     {:ok, fsm} = GenRabbitFSM.start_link(Tester, %{test: self(), subscribe_to: "foo.bar"})
     assert_receive :connected
@@ -84,7 +82,6 @@ defmodule Exdistex.GenRabbitFSMTest do
     assert_receive "got_it"
   end
 
-  @tag only: true
   test "when called, passes messages onto delegates handle_call" do
     initial_state = %{test: self(), subscribe_to: "foo.bar"}
     {:ok, fsm} = GenRabbitFSM.start_link(Tester, initial_state)

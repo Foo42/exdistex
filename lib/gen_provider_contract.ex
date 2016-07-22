@@ -18,6 +18,7 @@ defmodule Exdistex.GenProviderContract do
   end
 
   def start_link(contract_module, request, options \\ []) do
+    Logger.debug "options: #{inspect options}"
     Exdistex.GenRabbitFSM.start_link(__MODULE__, %{contract_module: contract_module, request: request, options: options}, options)
   end
 

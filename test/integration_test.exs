@@ -10,7 +10,6 @@ defmodule Exdistex.IntegrationTest do
     end
   end
 
-  @tag only: true
   @tag integration: true
   test "Can establish arrangement from a consumer contract to a producer" do
     test_pid = self()
