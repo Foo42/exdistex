@@ -1,5 +1,6 @@
 defmodule Exdistex.SimpleProvider do
   require Logger
+  use Exdistex.GenProvider
 
   def start_link(options \\ []) do
     Exdistex.GenProvider.start_link(__MODULE__, options)
